@@ -1,0 +1,427 @@
+//CREACTION DE LAS FUNCIONES DE LOS MOVIMIENTOS 
+CREATE OR REPLACE PROCEDURE  TOKENS_MOV (TOKEN TBL_TABLERO.ID_FICHA%TYPE, JUEGO TBL_JUEGO.ID%TYPE,X_INICIO TBL_TABLERO.FILA%TYPE,Y_INICIO TBL_TABLERO.COLUMNA%TYPE,X_NEW TBL_TABLERO.FILA%TYPE,Y_NEW TBL_TABLERO.COLUMNA%TYPE) IS
+
+
+BEGIN
+--SE DEBEN DE HACER DOS UPDATES AL TABLERO EN LA PRIMERA RECIBE EL ID POR PARAMETRO Y SE ACTUALIZA EN LA TABLA DONDE CUMPLA TODO
+UPDATE  TBL_TABLERO SET ID_FICHA = TOKEN
+        WHERE ID_JUEGO=JUEGO AND FILA=X_NEW AND COLUMNA=Y_NEW;
+          COMMIT;
+
+--LUEGO SE ACTUALIZA LA POSICION DONDE ESTABA LA FICHA PARA DEAR ESE ESPACIO VACIO QUE SE CONOCE CON EL ID 33
+
+UPDATE  TBL_TABLERO SET ID_FICHA= 33
+        WHERE ID_JUEGO=JUEGO AND FILA=X_NEW AND COLUMNA=Y_NEW;
+        COMMIT;
+
+
+
+
+end TOKENS_MOV;
+
+
+
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+CREATE OR REPLACE FUNCTION  TOKENS_MOV_RULES (GAME TBL_JUEGO.ID%TYPE,X_INICIO TBL_TABLERO.FILA%TYPE,Y_INICIO TBL_TABLERO.COLUMNA%TYPE,X_NEW TBL_TABLERO.FILA%TYPE,Y_NEW TBL_TABLERO.COLUMNA%TYPE)
+RETURN NUMBER
+    IS
+    NUM number(1);
+    TOKEN TBL_FICHAS.ID%TYPE:=FIND_ID(X_INICIO,Y_INICIO,GAME);
+    TOKEN_NAME TBL_FICHAS.NOMBRE%TYPE;
+    NEXT_TOKEN TBL_FICHAS.ID%TYPE:=FIND_ID(X_NEW,Y_NEW,GAME);
+    RESPONSE BOOLEAN:=FALSE;
+
+BEGIN
+    SELECT NOMBRE INTO TOKEN_NAME FROM TBL_FICHAS WHERE ID =TOKEN;
+    DBMS_OUTPUT.PUT_LINE('EL VALOR DE TOKEN  ES :  '||TOKEN);
+    DBMS_OUTPUT.PUT_LINE('EL VALOR DEL NOMBRE DE TOKEN  ES :  '||TOKEN_NAME);
+    DBMS_OUTPUT.PUT_LINE('EL VALOR DE LA FICHA PROX  ES :  '||NEXT_TOKEN);
+
+     CASE TOKEN_NAME
+        WHEN 'TORRE' THEN  NUM:=TOWER_MOV(X_INICIO,Y_INICIO,X_NEW,Y_NEW);
+        WHEN 'CABALLO' THEN NUM:=HORSE_MOV(X_INICIO,Y_INICIO,X_NEW,Y_NEW);--FALTA
+        WHEN 'ALFIL' THEN NUM:=BISHOP_MOV(X_INICIO,Y_INICIO,X_NEW,Y_NEW);
+        WHEN 'DAMA' THEN NUM:=QUEEN_MOV(X_INICIO,Y_INICIO,X_NEW,Y_NEW);
+        WHEN  'REY' THEN NUM:=KING_MOV(X_INICIO,Y_INICIO,X_NEW,Y_NEW);--FALTA
+        WHEN 'PEON' THEN NUM:=PAWN_MOV(TOKEN,NEXT_TOKEN,Y_INICIO,X_INICIO,Y_NEW,X_NEW);
+        END CASE;
+
+
+     IF(NUM=1)THEN
+          DBMS_OUTPUT.PUT_LINE('PASO EL CASE   ');
+         TOKENS_MOV(TOKEN,GAME,X_INICIO,Y_INICIO,X_NEW,Y_NEW);
+    end if;
+
+    RETURN NUM;
+end TOKENS_MOV_RULES;
+
+
+
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+CREATE OR REPLACE FUNCTION BISHOP_MOV( Y TBL_TABLERO.FILA%TYPE,X TBL_TABLERO.COLUMNA%TYPE,Y2 TBL_TABLERO.FILA%TYPE,X2 TBL_TABLERO.COLUMNA%TYPE)
+RETURN NUMBER  IS
+    NUM NUMBER(1);
+    NUM_TEMP NUMBER(2);
+    NUM_AUX NUMBER(2);
+    RES BOOLEAN:=FALSE;
+    BEGIN
+        NUM_TEMP:=KAR_TO_N(X);
+        NUM_AUX:=KAR_TO_N(X2);
+    IF(NUM_TEMP+Y=NUM_AUX+Y2 OR NUM_TEMP-Y=NUM_AUX-Y2 )THEN
+        RES:=TRUE;
+        END IF;
+
+    IF (RES)THEN
+        NUM:=1;
+        ELSE NUM:=0;
+    end if;
+    RETURN NUM;
+
+END BISHOP_MOV;
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+CREATE OR REPLACE FUNCTION QUEEN_MOV( Y TBL_TABLERO.FILA%TYPE,X TBL_TABLERO.COLUMNA%TYPE,Y2 TBL_TABLERO.FILA%TYPE,X2 TBL_TABLERO.COLUMNA%TYPE)
+RETURN NUMBER IS
+    NUM NUMBER(1);
+    NUM_TEMP NUMBER(2);
+    NUM_AUX NUMBER(2);
+    RES BOOLEAN:=FALSE;
+    BEGIN
+        NUM_TEMP:=KAR_TO_N(X);--COLUMNA1
+        NUM_AUX:=KAR_TO_N(X2);--COLUMNA2
+    IF(NUM_TEMP+Y=NUM_AUX+Y2 OR NUM_TEMP-Y=NUM_AUX-Y2 OR X=X2 OR Y=Y2)THEN--LA FORMULA DE LOS MOVIMIENTOS DE LA REYNA SON LA SUMA DE LAS FORMULAS DEL ALFIL Y LA TORRE!
+        RES:=TRUE;
+        END IF;
+/*DICE QUE SI COLUMNA MAS FILA (1)= COLUMNA + FILA2   OR SI COLUMNA-FILA 1 = COLUMNA - FILA 2    */
+IF (RES)THEN
+    NUM:=1;
+    ELSE NUM:=0;
+end if;
+
+
+    RETURN NUM;
+
+END QUEEN_MOV;
+
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION KING_MOV( Y TBL_TABLERO.FILA%TYPE,X TBL_TABLERO.COLUMNA%TYPE,Y2 TBL_TABLERO.FILA%TYPE,X2 TBL_TABLERO.COLUMNA%TYPE)
+RETURN NUMBER IS
+    NUM_TEMP NUMBER(2);
+    NUM_AUX NUMBER(2);
+    RES BOOLEAN:=FALSE;
+    NUM NUMBER(1);
+    BEGIN
+
+        NUM_TEMP:=KAR_TO_N(X);--COLUMNA1
+        NUM_AUX:=KAR_TO_N(X2);--COLUMNA2
+        IF (Y2 =Y+1 OR Y2=Y-1 OR NUM_TEMP=NUM_TEMP+1 OR NUM_TEMP=NUM_TEMP-1 OR NUM_TEMP+Y=NUM_AUX+Y2 OR NUM_TEMP-Y=NUM_AUX-Y2 OR X=X2 OR Y=Y2)THEN
+                RES:=TRUE;
+        END IF;
+
+IF (RES)THEN
+    NUM:=1;
+    ELSE NUM:=0;
+end if;
+
+    RETURN NUM;
+
+
+END KING_MOV;
+
+
+
+/*ESTA FUNCION VALIDA QUE LA TORRE SE MUEVA SIEMPRE SOBRE UN MISMO EJE, ES DECIR QUE SI SU POSIION ACTUAL ES EJEMPLO C1 Y SE QUIERE MOVER DE MANERA HORIZONTAL SERA NECESARIO VALIDAR
+  QUE SU EJE X NO CAMBIA, O BIEN QUE SI SE QUIERE MOVER DE MANERA VERTICAL SU EJE Y NO CAMBIA*/
+CREATE OR REPLACE FUNCTION TOWER_MOV(X1 TBL_TABLERO.FILA%TYPE,Y1 TBL_TABLERO.COLUMNA%TYPE,X2 TBL_TABLERO.FILA%TYPE,Y2 TBL_TABLERO.COLUMNA%TYPE)
+RETURN NUMBER IS
+    NUM NUMBER(1);
+    APROV  BOOLEAN :=FALSE;
+    BEGIN
+    IF(X1=X2 OR Y1=Y2)THEN
+        APROV:=TRUE;
+        END IF;
+
+    IF (APROV)THEN
+
+        NUM:=1;
+        ELSE NUM:=0;
+    end if;
+    RETURN NUM;
+
+END TOWER_MOV;
+
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+CREATE OR REPLACE FUNCTION KAR_TO_N(X TBL_TABLERO.COLUMNA%TYPE)
+RETURN NUMBER IS
+    NUM  NUMBER(2);
+    BEGIN
+     CASE X
+        WHEN 'A' THEN NUM:=1;
+        WHEN 'B' THEN NUM:=2;
+        WHEN 'C' THEN NUM:=3;
+        WHEN 'D' THEN NUM:=4;
+        WHEN 'E' THEN NUM:=5;
+        WHEN 'F' THEN NUM:=6;
+        WHEN 'G' THEN NUM:=7;
+        WHEN 'H' THEN NUM:=8;
+        END CASE;
+
+        RETURN NUM;
+        END KAR_TO_N;
+
+CREATE OR REPLACE FUNCTION HORSE_MOV(X_INICIO TBL_TABLERO.FILA%TYPE,Y_INICIO TBL_TABLERO.COLUMNA%TYPE,X_NEW TBL_TABLERO.FILA%TYPE,Y_NEW TBL_TABLERO.COLUMNA%TYPE)
+RETURN  NUMBER IS
+     NUM NUMBER(1);
+     COL1      NUMBER(2);
+     COL2      NUMBER(2);
+     DATO      NUMBER(2);
+     DATO_B    NUMBER(2);
+     MOV       NUMBER(2);
+     ALLOWED   BOOLEAN:= FALSE;
+BEGIN
+    COL1:=KAR_TO_N(Y_INICIO);
+    DBMS_OUTPUT.PUT_LINE('EL VALOR DE LA COLUMNA 1 ES :  '||COL1);
+    COL2:=KAR_TO_N(Y_NEW);
+       DBMS_OUTPUT.PUT_LINE('EL VALOR DE LA COLUMNA 2 ES :  '||COL2);
+
+    DATO:=(X_INICIO-X_NEW)*(X_INICIO-X_NEW);
+       DBMS_OUTPUT.PUT_LINE('EL VALOR DE DATO ES  :  '||DATO);
+
+    DATO_B:=(COL1-COL2)*(COL1-COL2);
+       DBMS_OUTPUT.PUT_LINE('EL VALOR DE DATO_B ES :  '||DATO_B);
+
+    MOV:=DATO+DATO_B;
+       DBMS_OUTPUT.PUT_LINE('EL VALOR DE MOV  ES :  '||MOV);
+
+    IF MOV=5 THEN
+        ALLOWED:=TRUE;
+    end if;
+
+    IF (ALLOWED) THEN
+        NUM:=1;
+        ELSE NUM:=0;
+    end if;
+    RETURN NUM;
+
+end HORSE_MOV;
+
+DECLARE
+
+
+    BEGIN
+    IF TOWER_(1,'B',3,'D')THEN
+    DBMS_OUTPUT.PUT_LINE('EL MOVIMIENTO SI ES PERMITIDO');
+    ELSE    DBMS_OUTPUT.PUT_LINE('MOVIMIENTO INDEBIDO ');
+    end if;
+
+end;
+
+
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION FIND_INITIAL_X(ID_TOKEN TBL_TABLERO.ID_FICHA%TYPE)
+RETURN NUMBER IS
+    X TBL_TABLERO.FILA%TYPE;
+    BEGIN
+     CASE ID_TOKEN
+        WHEN 9   THEN  X:=7;
+        WHEN 10  THEN  X:=7;
+        WHEN 11  THEN  X:=7;
+        WHEN 12  THEN  X:=7;
+        WHEN 13  THEN  X:=7;
+        WHEN 14  THEN  X:=7;
+        WHEN 15  THEN  X:=7;
+        WHEN 16  THEN  X:=7;
+        WHEN 25  THEN  X:=2;
+        WHEN 26  THEN  X:=2;
+        WHEN 27  THEN  X:=2;
+        WHEN 28  THEN  X:=2;
+        WHEN 29  THEN  X:=2;
+        WHEN 30  THEN  X:=2;
+        WHEN 31  THEN  X:=2;
+        WHEN 32  THEN  X:=2;
+        END CASE;
+
+        RETURN X;
+        END FIND_INITIAL_X;
+
+    -------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION FIND_INITIAL_Y(ID_TOKEN TBL_TABLERO.ID_FICHA%TYPE)
+RETURN TBL_TABLERO.COLUMNA%TYPE IS
+    Y TBL_TABLERO.COLUMNA%TYPE;
+    BEGIN
+     CASE ID_TOKEN
+        WHEN 9   THEN  Y:='A';
+        WHEN 10  THEN  Y:='B';
+        WHEN 11  THEN  Y:='C';
+        WHEN 12  THEN  Y:='D';
+        WHEN 13  THEN  Y:='E';
+        WHEN 14  THEN  Y:='F';
+        WHEN 15  THEN  Y:='G';
+        WHEN 16  THEN  Y:='H';
+        WHEN 25  THEN  Y:='A';
+        WHEN 26  THEN  Y:='B';
+        WHEN 27  THEN  Y:='C';
+        WHEN 28  THEN  Y:='D';
+        WHEN 29  THEN  Y:='E';
+        WHEN 30  THEN  Y:='F';
+        WHEN 31  THEN  Y:='G';
+        WHEN 32  THEN  Y:='H';
+        END CASE;
+
+        RETURN Y;
+        END FIND_INITIAL_Y;
+
+DECLARE
+    CHARK TBL_TABLERO.COLUMNA%TYPE;
+    BEGIN
+    CHARK:=FIND_INITIAL_Y(9);
+    DBMS_OUTPUT.PUT_LINE(CHARK);
+end;
+
+CREATE OR REPLACE FUNCTION PAWN_MOV(TOKEN TBL_TABLERO.ID_FICHA%TYPE, NEXT_TOKEN TBL_TABLERO.ID_FICHA%TYPE, Y1 TBL_TABLERO.COLUMNA%TYPE ,X1 TBL_TABLERO.FILA%TYPE, Y2 TBL_TABLERO.COLUMNA%TYPE,X2 TBL_TABLERO.FILA%TYPE)
+RETURN number IS
+   NUM NUMBER(1);
+   IS_FIRST_MOVE BOOLEAN;
+   MAX_X_FIRST_MOVE   TBL_TABLERO.FILA%TYPE:=X1+2;
+   MAX_REGULAR_MOVE TBL_TABLERO.FILA%TYPE:=X1+1;
+   DIAGONAL BOOLEAN:=(Y1!=Y2);
+   RESPONSE BOOLEAN:=FALSE;
+   EAT_MOV BOOLEAN;
+    BEGIN
+ IS_FIRST_MOVE:=FIRST_MOVE(TOKEN,X1,Y1);
+IF (IS_FIRST_MOVE AND X2=MAX_X_FIRST_MOVE AND Y1=Y2)THEN
+    RESPONSE :=TRUE;
+    ELSE
+        IF(DIAGONAL AND NEXT_TOKEN!=33) THEN
+            RESPONSE:=EAT_TOKEN(TOKEN,NEXT_TOKEN);
+            ELSE
+                IF(DIAGONAL=FALSE AND NEXT_TOKEN=33)THEN
+                    RESPONSE:=TRUE;
+                end if;
+        end if;
+end if;
+
+IF (RESPONSE )THEN
+    NUM:=1;
+ELSE NUM:=0;
+end if;
+
+    RETURN NUM;
+
+    end PAWN_MOV;
+
+
+
+
+DECLARE
+
+BEGIN
+    IF (PAWN_MOV(15,7,'G',6,'H')=TRUE)THEN
+        DBMS_OUTPUT.PUT_LINE('BIEN SI SE VA A MOVER AL FIN');
+        ELSE DBMS_OUTPUT.PUT_LINE('NO SE PERMITE ESE MOVIMIENTO');
+    end if;
+
+
+
+end;
+
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+CREATE OR REPLACE FUNCTION EAT_TOKEN(ID1 TBL_TABLERO.ID_FICHA%TYPE,ID2 TBL_TABLERO.ID_FICHA%TYPE)
+ RETURN BOOLEAN IS
+
+EAT_TOKEN BOOLEAN:=FALSE;
+COLOR1 TBL_FICHAS.COLOR%TYPE:=FIND_COLOR(ID1);
+COLOR2 TBL_FICHAS.COLOR%TYPE:=FIND_COLOR(ID2);
+
+
+BEGIN
+
+IF COLOR1!=COLOR2 THEN
+    EAT_TOKEN:=TRUE;
+  end if;
+ RETURN EAT_TOKEN;
+end EAT_TOKEN;
+
+
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+CREATE OR REPLACE FUNCTION FIND_COLOR(ID_TOKEN TBL_TABLERO.ID_FICHA%TYPE) RETURN
+TBL_FICHAS.COLOR%TYPE IS
+
+TOKEN_COLOR TBL_FICHAS.COLOR%TYPE;
+BEGIN
+    IF ID_TOKEN !=33 THEN
+    SELECT COLOR INTO TOKEN_COLOR FROM TBL_FICHAS WHERE ID=ID_TOKEN;
+
+ELSE TOKEN_COLOR:='';
+END IF;
+
+    RETURN TOKEN_COLOR;
+
+end FIND_COLOR;
+
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+
+CREATE OR REPLACE  FUNCTION FIND_ID(LINE TBL_TABLERO.ID_FICHA%TYPE,COL TBL_TABLERO.COLUMNA%TYPE,GAME TBL_TABLERO.ID_JUEGO%TYPE)
+RETURN TBL_TABLERO.ID_FICHA%TYPE IS
+    TOKEN TBL_TABLERO.ID_FICHA%TYPE ;
+BEGIN
+    SELECT ID_FICHA INTO TOKEN FROM TBL_TABLERO WHERE ID_JUEGO = GAME AND FILA =LINE AND COLUMNA =COL;
+
+    RETURN TOKEN;
+
+end FIND_ID;
+
+
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION FIND_NAME(ID_T TBL_TABLERO.ID_FICHA%TYPE) RETURN
+TBL_FICHAS.NOMBRE%TYPE IS
+
+TOKEN_NAME TBL_FICHAS.NOMBRE%TYPE;
+BEGIN
+    SELECT NOMBRE INTO TOKEN_NAME FROM TBL_FICHAS WHERE ID =ID_T;
+
+RETURN TOKEN_NAME ;
+
+end FIND_NAME;
+
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+
+CREATE OR REPLACE FUNCTION FIRST_MOVE(TOKEN TBL_TABLERO.ID_FICHA%TYPE,X TBL_TABLERO.FILA%TYPE, Y TBL_TABLERO.COLUMNA%TYPE)
+RETURN BOOLEAN IS
+
+    X1 TBL_TABLERO.FILA%TYPE:=FIND_INITIAL_X(TOKEN);
+    Y1 TBL_TABLERO.COLUMNA%TYPE:=FIND_INITIAL_Y(TOKEN);
+    RESPONSE BOOLEAN :=FALSE;
+BEGIN
+IF (X1=X AND Y1=Y)
+    THEN RESPONSE :=TRUE;
+    END IF;
+  RETURN RESPONSE;
+end FIRST_MOVE;
+
+    SELECT * FROM TBL_JUEGO;
+SELECT * FROM TBL_TABLERO WHERE ID_JUEGO = 10;
+
+DECLARE
+    BEGIN
+
+    IF TOKENS_MOV_RULES(10,2,'B',3,'G')THEN
+        DBMS_OUTPUT.PUT_LINE('TODO UN EXITO');
+        ELSE
+              DBMS_OUTPUT.PUT_LINE('ERROR ');
+    end if;
+end;
+
+DECLARE
+    ID TBL_TABLERO.ID_FICHA%TYPE;
+    BEGIN
+   ID:=FIND_ID(2,'A',10);
+        DBMS_OUTPUT.PUT_LINE('EL VALOR DE ID ES : '||ID);
+end;
